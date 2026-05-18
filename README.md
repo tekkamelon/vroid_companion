@@ -1,0 +1,2 @@
+# vroid_companion
+VRoid Studioで作成したVRMモデルをウィンドウに表示,テキスト入力をACP対応のエージェント(zeroclaw・opencode・gooseなど)に中継するデスクトップアプリケーション
