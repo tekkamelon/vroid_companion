@@ -11,41 +11,136 @@ const canvas = document.getElementById('vrm-canvas');
 const log    = document.getElementById('log');
 const input  = document.getElementById('msg-input');
 const btn    = document.getElementById('send-btn');
+const bootNote = document.getElementById('boot-note');
+
+const status = document.createElement('div');
+status.id = 'status';
+status.textContent = 'starting...';
+document.body.appendChild(status);
+
+function report(text) {
+    status.textContent = text;
+    if (bootNote) bootNote.textContent = text;
+}
+
+window.addEventListener('error', (event) => {
+    report(`JS error: ${event.message}`);
+    console.error(event.error ?? event.message);
+});
+
+window.addEventListener('unhandledrejection', (event) => {
+    report(`Promise rejected: ${event.reason?.message ?? event.reason}`);
+    console.error(event.reason);
+});
 
 // ---- Three.js セットアップ ----
-const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: true });
+const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: false, powerPreference: 'high-performance' });
 renderer.setPixelRatio(window.devicePixelRatio);
 renderer.setSize(canvas.clientWidth, canvas.clientHeight);
+renderer.setClearColor(0x1a1a2e, 1);
+renderer.outputColorSpace = THREE.SRGBColorSpace;
+renderer.toneMapping = THREE.ACESFilmicToneMapping;
+renderer.toneMappingExposure = 1.0;
+report(`WebGL ${renderer.capabilities.isWebGL2 ? '2' : '1'} ready`);
 
 const scene  = new THREE.Scene();
 const camera = new THREE.PerspectiveCamera(30, canvas.clientWidth / canvas.clientHeight, 0.1, 20);
 camera.position.set(0, 1.4, 3);
 
-const light = new THREE.DirectionalLight(0xffffff, 1.0);
-light.position.set(1, 2, 3);
-scene.add(light);
-scene.add(new THREE.AmbientLight(0xffffff, 0.5));
+const hemiLight = new THREE.HemisphereLight(0xc8d9ff, 0x223355, 1.2);
+scene.add(hemiLight);
+const keyLight = new THREE.DirectionalLight(0xffffff, 1.8);
+keyLight.position.set(1.5, 3.0, 2.0);
+scene.add(keyLight);
+const fillLight = new THREE.DirectionalLight(0x88aaff, 0.6);
+fillLight.position.set(-2.0, 1.0, 1.0);
+scene.add(fillLight);
+scene.background = new THREE.Color(0x1a1a2e);
+scene.add(new THREE.GridHelper(10, 10, 0x6ba4ff, 0x2e3658));
 
 let currentVrm = null;
+const cameraTarget = new THREE.Vector3();
+
+function resizeRenderer() {
+    const width = canvas.clientWidth;
+    const height = canvas.clientHeight;
+    if (!width || !height) return;
+
+    const needResize = canvas.width !== Math.floor(width * window.devicePixelRatio)
+        || canvas.height !== Math.floor(height * window.devicePixelRatio);
+    if (!needResize) return;
+
+    renderer.setPixelRatio(window.devicePixelRatio);
+    renderer.setSize(width, height, false);
+    camera.aspect = width / height;
+    camera.updateProjectionMatrix();
+    report(`renderer ${width}x${height}`);
+}
+
+function frameCurrentVrm() {
+    if (!currentVrm) return;
+
+    const box = new THREE.Box3().setFromObject(currentVrm.scene);
+    if (box.isEmpty()) return;
+
+    const size = new THREE.Vector3();
+    const center = new THREE.Vector3();
+    box.getSize(size);
+    box.getCenter(center);
+
+    currentVrm.scene.position.sub(center);
+
+    const maxDim = Math.max(size.x, size.y, size.z);
+    const fov = THREE.MathUtils.degToRad(camera.fov);
+    const distance = (maxDim / 2) / Math.tan(fov / 2) * 1.8;
+
+    camera.position.set(0, Math.max(size.y * 0.35, 1.2), distance);
+    camera.near = Math.max(distance / 100, 0.01);
+    camera.far = distance * 100;
+    camera.updateProjectionMatrix();
+    cameraTarget.set(0, Math.max(size.y * 0.35, 1.2), 0);
+    camera.lookAt(cameraTarget);
+}
 
 // ---- VRMロード ----
 function loadVrm(url) {
     const loader = new GLTFLoader();
     loader.register((parser) => new VRMLoaderPlugin(parser));
-    loader.load(url, (gltf) => {
-        if (currentVrm) { scene.remove(currentVrm.scene); VRMUtils.deepDispose(currentVrm.scene); }
-        currentVrm = gltf.userData.vrm;
-        VRMUtils.removeUnnecessaryVertices(currentVrm.scene);
-        VRMUtils.combineSkeletons(currentVrm.scene);
-        currentVrm.scene.rotation.y = Math.PI;
-        scene.add(currentVrm.scene);
-    });
+    loader.load(
+        url,
+        (gltf) => {
+            if (currentVrm) { scene.remove(currentVrm.scene); VRMUtils.deepDispose(currentVrm.scene); }
+            currentVrm = gltf.userData.vrm;
+            VRMUtils.removeUnnecessaryVertices(currentVrm.scene);
+            VRMUtils.combineSkeletons(currentVrm.scene);
+            currentVrm.scene.rotation.y = Math.PI;
+            let texturedMaterials = 0;
+            let totalMaterials = 0;
+            currentVrm.scene.traverse((object) => {
+                const materials = Array.isArray(object.material) ? object.material : object.material ? [object.material] : [];
+                totalMaterials += materials.length;
+                texturedMaterials += materials.filter((material) => material?.map || material?.emissiveMap || material?.normalMap || material?.metalnessMap || material?.roughnessMap).length;
+            });
+            scene.add(currentVrm.scene);
+            frameCurrentVrm();
+            appendLog('Debug', `materials=${totalMaterials} textured=${texturedMaterials}`);
+            appendLog('System', 'VRM loaded');
+            report('VRM loaded');
+        },
+        undefined,
+        (error) => {
+            console.error('[VRM] failed to load', error);
+            appendLog('System', `VRM load failed: ${error?.message ?? error}`);
+            report(`VRM load failed`);
+        },
+    );
 }
 
 // ---- レンダーループ ----
 const clock = new THREE.Clock();
 function animate() {
     requestAnimationFrame(animate);
+    resizeRenderer();
     const delta = clock.getDelta();
     if (currentVrm) currentVrm.update(delta);
     renderer.render(scene, camera);
@@ -85,4 +180,4 @@ window.companion.onResponse((data) => {
 });
 
 // ---- 初期VRMロード (モデルがあれば) ----
-// loadVrm('./assets/models/model.vrm');
+loadVrm(new URL('../assets/models/model.vrm', import.meta.url).href);
