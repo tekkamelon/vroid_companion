@@ -1,0 +1,16 @@
+# VRoid Companion 設定ファイル
+
+[agent]
+# zeroclawのgateway REST APIエンドポイント
+# (ACPサーバモードが実装されるまではgateway経由を使用)
+gateway_url = "http://localhost:8080"
+# セッションキー (複数クライアントで共有する場合に指定)
+session_key = ""
+
+[model]
+# VRMファイルのパス (絶対パスまたはassets/models/からの相対)
+vrm_path = "assets/models/model.vrm"
+
+[display]
+width  = 800
+height = 900

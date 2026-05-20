@@ -63,9 +63,9 @@ install_fnm() {
 
 install_node() {
     log "Node.js LTS (v22系) をインストールしています..."
-    fnm install --lts
-    fnm use --lts
-    fnm default lts-latest
+    fnm install "lts-latest"
+    fnm use "lts-latest"
+    fnm default "lts-latest"
     node --version
     npm --version
     log "Node.js インストール完了"
@@ -116,7 +116,7 @@ install_system_deps() {
 # --------------------------------------------------------------------------
 # プロジェクト初期化
 # --------------------------------------------------------------------------
-PROJECT_DIR="${1:-$HOME/Documents/github/vroid-companion}"
+PROJECT_DIR="${1:-$HOME/projects/vroid-companion}"
 
 init_project() {
     if [ -d "$PROJECT_DIR" ]; then
