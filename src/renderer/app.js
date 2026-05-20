@@ -33,6 +33,11 @@ window.addEventListener('unhandledrejection', (event) => {
     console.error(event.reason);
 });
 
+window.addEventListener('securitypolicyviolation', (event) => {
+    appendLog('Debug', `CSP violation: ${event.violatedDirective} blocked=${event.blockedURI}`);
+    console.warn('[CSP]', event.violatedDirective, event.blockedURI);
+});
+
 // ---- Three.js セットアップ ----
 const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: false, powerPreference: 'high-performance' });
 renderer.setPixelRatio(window.devicePixelRatio);
@@ -104,26 +109,51 @@ function frameCurrentVrm() {
 
 // ---- VRMロード ----
 function loadVrm(url) {
-    const loader = new GLTFLoader();
+    const loadingManager = new THREE.LoadingManager();
+    loadingManager.onStart = (loaded, total, resourceUrl) => {
+        appendLog('Debug', `loading start ${loaded}/${total} ${resourceUrl ?? ''}`);
+    };
+    loadingManager.onProgress = (resourceUrl, loaded, total) => {
+        appendLog('Debug', `loading progress ${loaded}/${total} ${resourceUrl ?? ''}`);
+    };
+    loadingManager.onLoad = () => {
+        appendLog('Debug', 'loading manager complete');
+    };
+    loadingManager.onError = (resourceUrl) => {
+        appendLog('Debug', `loading error ${resourceUrl ?? '(unknown)'}`);
+    };
+    const loader = new GLTFLoader(loadingManager);
     loader.register((parser) => new VRMLoaderPlugin(parser));
     loader.load(
         url,
         (gltf) => {
             if (currentVrm) { scene.remove(currentVrm.scene); VRMUtils.deepDispose(currentVrm.scene); }
             currentVrm = gltf.userData.vrm;
+            const summarizeMaterials = (root) => {
+                let textured = 0;
+                let total = 0;
+                const debug = [];
+                root.traverse((object) => {
+                    const materials = Array.isArray(object.material) ? object.material : object.material ? [object.material] : [];
+                    total += materials.length;
+                    textured += materials.filter((material) => material?.map || material?.emissiveMap || material?.normalMap || material?.metalnessMap || material?.roughnessMap).length;
+                    for (const material of materials) {
+                        debug.push(`${material?.name ?? '(unnamed)'}|${material?.type ?? '(no-type)'}|map=${Boolean(material?.map)}|emi=${Boolean(material?.emissiveMap)}|nrm=${Boolean(material?.normalMap)}|alpha=${Boolean(material?.alphaMap)}`);
+                    }
+                });
+                return { total, textured, debug };
+            };
+            const beforeOptimize = summarizeMaterials(currentVrm.scene);
             VRMUtils.removeUnnecessaryVertices(currentVrm.scene);
             VRMUtils.combineSkeletons(currentVrm.scene);
+            const afterOptimize = summarizeMaterials(currentVrm.scene);
             currentVrm.scene.rotation.y = Math.PI;
-            let texturedMaterials = 0;
-            let totalMaterials = 0;
-            currentVrm.scene.traverse((object) => {
-                const materials = Array.isArray(object.material) ? object.material : object.material ? [object.material] : [];
-                totalMaterials += materials.length;
-                texturedMaterials += materials.filter((material) => material?.map || material?.emissiveMap || material?.normalMap || material?.metalnessMap || material?.roughnessMap).length;
-            });
+            appendLog('Debug', `before optimize materials=${beforeOptimize.total} textured=${beforeOptimize.textured}`);
+            appendLog('Debug', beforeOptimize.debug.slice(0, 12).join(' ; '));
+            appendLog('Debug', `after optimize materials=${afterOptimize.total} textured=${afterOptimize.textured}`);
+            appendLog('Debug', afterOptimize.debug.slice(0, 12).join(' ; '));
             scene.add(currentVrm.scene);
             frameCurrentVrm();
-            appendLog('Debug', `materials=${totalMaterials} textured=${texturedMaterials}`);
             appendLog('System', 'VRM loaded');
             report('VRM loaded');
         },
