@@ -65,6 +65,7 @@ scene.add(new THREE.GridHelper(10, 10, 0x6ba4ff, 0x2e3658));
 
 let currentVrm = null;
 const cameraTarget = new THREE.Vector3();
+let framing = null;
 
 function resizeRenderer() {
     const width = canvas.clientWidth;
@@ -79,31 +80,39 @@ function resizeRenderer() {
     renderer.setSize(width, height, false);
     camera.aspect = width / height;
     camera.updateProjectionMatrix();
+    frameCurrentVrm();
     report(`renderer ${width}x${height}`);
 }
+window.addEventListener('resize', () => {
+    resizeRenderer();
+    frameCurrentVrm();
+});
 
 function frameCurrentVrm() {
-    if (!currentVrm) return;
+    if (!currentVrm || !framing) return;
 
-    const box = new THREE.Box3().setFromObject(currentVrm.scene);
-    if (box.isEmpty()) return;
+    const vFov = THREE.MathUtils.degToRad(camera.fov);
+    const hFov = 2 * Math.atan(Math.tan(vFov / 2) * camera.aspect);
+    const topY = framing.sizeY / 2;
+    const fullHeight = framing.sizeY;
 
-    const size = new THREE.Vector3();
-    const center = new THREE.Vector3();
-    box.getSize(size);
-    box.getCenter(center);
+    // 画面内に「頭頂〜太もも付近」を安定して収める。
+    const focusTop = topY - fullHeight * 0.02;
+    const focusBottom = topY - fullHeight * 0.70;
+    const focusHeight = focusTop - focusBottom;
+    const focusCenterY = (focusTop + focusBottom) * 0.5;
 
-    currentVrm.scene.position.sub(center);
+    // Tポーズ腕幅は無視し、胴体幅ベースで横方向だけ最低限見る。
+    const torsoWidth = fullHeight * 0.42;
+    const distanceByHeight = (focusHeight * 0.5) / Math.tan(vFov / 2);
+    const distanceByWidth = (torsoWidth * 0.5) / Math.tan(hFov / 2);
+    const distance = Math.max(distanceByHeight, distanceByWidth) * 1.03;
 
-    const maxDim = Math.max(size.x, size.y, size.z);
-    const fov = THREE.MathUtils.degToRad(camera.fov);
-    const distance = (maxDim / 2) / Math.tan(fov / 2) * 1.8;
-
-    camera.position.set(0, Math.max(size.y * 0.35, 1.2), distance);
+    camera.position.set(0, focusCenterY + fullHeight * 0.16, distance);
     camera.near = Math.max(distance / 100, 0.01);
     camera.far = distance * 100;
     camera.updateProjectionMatrix();
-    cameraTarget.set(0, Math.max(size.y * 0.35, 1.2), 0);
+    cameraTarget.set(0, focusCenterY + fullHeight * 0.12, 0);
     camera.lookAt(cameraTarget);
 }
 
@@ -148,6 +157,20 @@ function loadVrm(url) {
             VRMUtils.combineSkeletons(currentVrm.scene);
             const afterOptimize = summarizeMaterials(currentVrm.scene);
             currentVrm.scene.rotation.y = Math.PI;
+            const box = new THREE.Box3().setFromObject(currentVrm.scene);
+            const size = new THREE.Vector3();
+            const center = new THREE.Vector3();
+            box.getSize(size);
+            box.getCenter(center);
+            framing = {
+                sizeX: size.x,
+                sizeY: size.y,
+                sizeZ: size.z,
+                centerX: center.x,
+                centerY: center.y,
+                centerZ: center.z,
+            };
+            currentVrm.scene.position.set(-framing.centerX, -framing.centerY, -framing.centerZ);
             appendLog('Debug', `before optimize materials=${beforeOptimize.total} textured=${beforeOptimize.textured}`);
             appendLog('Debug', beforeOptimize.debug.slice(0, 12).join(' ; '));
             appendLog('Debug', `after optimize materials=${afterOptimize.total} textured=${afterOptimize.textured}`);
