@@ -2,9 +2,11 @@
 <html lang="ja">
 <head>
   <meta charset="UTF-8">
+  <!-- Content Security Policy: 外部リソースの読み込みを制限する -->
   <meta http-equiv="Content-Security-Policy"
         content="default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' blob: data:; connect-src 'self' blob: data:;">
   <title>VRoid Companion</title>
+  <!-- import map: three.js のパスを解決するためのマッピング -->
   <script type="importmap">
     {
       "imports": {
@@ -13,12 +15,19 @@
     }
   </script>
   <style>
+    /* すべての要素に border-box を適用してサイズ計算を統一する */
     * { box-sizing: border-box; margin: 0; padding: 0; }
+    /* CSS カスタムプロパティ: チャットエリアの高さを定義する */
     :root { --chat-height: 240px; }
+    /* ページ全体のサイズを画面いっぱいに設定する */
     html, body { width: 100%; height: 100%; overflow: hidden; }
+    /* ページ全体の基本スタイルを設定する */
     body { background: #1a1a2e; color: #e0e0ff; font-family: sans-serif; height: 100%; display: flex; flex-direction: column; }
+    /* 3Dキャンバス表示エリア: 残りのスペースをすべて占有する */
     #canvas-area { position: relative; width: 100%; flex: 1 1 auto; min-height: 0; overflow: hidden; }
+    /* canvas 要素を親要素いっぱいに広げる */
     canvas { width: 100%; height: 100%; display: block; }
+    /* 起動時の状態表示用ノート: 画面左上に表示される */
     #boot-note {
       position: absolute;
       inset: 16px auto auto 16px;
@@ -32,6 +41,7 @@
       letter-spacing: 0.02em;
       pointer-events: none;
     }
+    /* ステータス表示: 画面上部に現在の状態を表示する */
     #status {
       position: fixed;
       top: 8px;
@@ -44,25 +54,37 @@
       font-size: 12px;
       pointer-events: none;
     }
+    /* チャットエリア: 下部に固定された高さの領域 */
     #chat-area { width: 100%; flex: 0 0 var(--chat-height); min-height: var(--chat-height); max-height: var(--chat-height); overflow: hidden; background: #16213e; display: flex; flex-direction: column; padding: 8px; gap: 8px; }
+    /* 会話ログ表示領域: スクロール可能なテキストエリア */
     #log { flex: 1 1 auto; min-height: 0; overflow-y: auto; overflow-x: hidden; font-size: 13px; line-height: 1.5; white-space: pre-wrap; overflow-wrap: anywhere; }
+    /* 入力欄とボタンの横並びレイアウト */
     #input-row { display: flex; gap: 8px; }
+    /* テキスト入力欄のスタイル */
     #msg-input { flex: 1; background: #0f3460; border: 1px solid #533483; color: #e0e0ff; border-radius: 4px; padding: 6px 10px; font-size: 14px; }
+    /* 送信ボタンのスタイル */
     #send-btn { background: #533483; color: #fff; border: none; border-radius: 4px; padding: 6px 16px; cursor: pointer; }
   </style>
 </head>
 <body>
+  <!-- 3Dモデル表示エリア -->
   <div id="canvas-area">
+    <!-- 起動時の読み込み状態を表示する要素 -->
     <div id="boot-note">VRoid Companion starting...</div>
+    <!-- Three.js で描画する canvas 要素 -->
     <canvas id="vrm-canvas"></canvas>
   </div>
+  <!-- チャットUIエリア -->
   <div id="chat-area">
+    <!-- 会話ログの表示領域 -->
     <div id="log"></div>
+    <!-- メッセージ入力欄と送信ボタン -->
     <div id="input-row">
       <input id="msg-input" type="text" placeholder="メッセージを入力...">
       <button id="send-btn">送信</button>
     </div>
   </div>
+  <!-- メインのアプリケーションスクリプトをモジュールとして読み込む -->
   <script type="module" src="./app.js"></script>
 </body>
 </html>
