@@ -16,8 +16,8 @@
     * { box-sizing: border-box; margin: 0; padding: 0; }
     :root { --chat-height: 240px; }
     html, body { width: 100%; height: 100%; overflow: hidden; }
-    body { background: #1a1a2e; color: #e0e0ff; font-family: sans-serif; height: 100%; }
-    #canvas-area { position: relative; width: 100%; height: calc(100% - var(--chat-height)); min-height: 0; overflow: hidden; }
+    body { background: #1a1a2e; color: #e0e0ff; font-family: sans-serif; height: 100%; display: flex; flex-direction: column; }
+    #canvas-area { position: relative; width: 100%; flex: 1 1 auto; min-height: 0; overflow: hidden; }
     canvas { width: 100%; height: 100%; display: block; }
     #boot-note {
       position: absolute;
@@ -44,7 +44,7 @@
       font-size: 12px;
       pointer-events: none;
     }
-    #chat-area { width: 100%; height: var(--chat-height); background: #16213e; display: flex; flex-direction: column; padding: 8px; gap: 8px; }
+    #chat-area { width: 100%; flex: 0 0 var(--chat-height); min-height: var(--chat-height); max-height: var(--chat-height); overflow: hidden; background: #16213e; display: flex; flex-direction: column; padding: 8px; gap: 8px; }
     #log { flex: 1 1 auto; min-height: 0; overflow-y: auto; overflow-x: hidden; font-size: 13px; line-height: 1.5; white-space: pre-wrap; overflow-wrap: anywhere; }
     #input-row { display: flex; gap: 8px; }
     #msg-input { flex: 1; background: #0f3460; border: 1px solid #533483; color: #e0e0ff; border-radius: 4px; padding: 6px 10px; font-size: 14px; }

@@ -8,6 +8,7 @@ import { GLTFLoader } from '../../node_modules/three/examples/jsm/loaders/GLTFLo
 import { VRMLoaderPlugin, VRMUtils } from '../../node_modules/@pixiv/three-vrm/lib/three-vrm.module.js';
 
 const canvas = document.getElementById('vrm-canvas');
+const canvasArea = document.getElementById('canvas-area');
 const log    = document.getElementById('log');
 const input  = document.getElementById('msg-input');
 const btn    = document.getElementById('send-btn');
@@ -68,25 +69,22 @@ const cameraTarget = new THREE.Vector3();
 let framing = null;
 
 function resizeRenderer() {
-    const width = canvas.clientWidth;
-    const height = canvas.clientHeight;
+    const width = canvasArea?.clientWidth ?? canvas.clientWidth;
+    const height = canvasArea?.clientHeight ?? canvas.clientHeight;
     if (!width || !height) return;
 
-    const needResize = canvas.width !== Math.floor(width * window.devicePixelRatio)
-        || canvas.height !== Math.floor(height * window.devicePixelRatio);
-    if (!needResize) return;
-
     renderer.setPixelRatio(window.devicePixelRatio);
-    renderer.setSize(width, height, false);
+    renderer.setSize(width, height, true);
     camera.aspect = width / height;
     camera.updateProjectionMatrix();
     frameCurrentVrm();
     report(`renderer ${width}x${height}`);
 }
-window.addEventListener('resize', () => {
+const resizeObserver = new ResizeObserver(() => {
     resizeRenderer();
     frameCurrentVrm();
 });
+if (canvasArea) resizeObserver.observe(canvasArea);
 
 function frameCurrentVrm() {
     if (!currentVrm || !framing) return;
@@ -96,23 +94,27 @@ function frameCurrentVrm() {
     const topY = framing.sizeY / 2;
     const fullHeight = framing.sizeY;
 
-    // 画面内に「頭頂〜太もも付近」を安定して収める。
-    const focusTop = topY - fullHeight * 0.02;
-    const focusBottom = topY - fullHeight * 0.70;
+    // 「頭頂〜太もも」を基準に、縦横の占有率が一定になる距離を計算する。
+    const focusTop = topY - fullHeight * 0.01;
+    const focusBottom = topY - fullHeight * 0.76;
     const focusHeight = focusTop - focusBottom;
     const focusCenterY = (focusTop + focusBottom) * 0.5;
 
-    // Tポーズ腕幅は無視し、胴体幅ベースで横方向だけ最低限見る。
-    const torsoWidth = fullHeight * 0.42;
-    const distanceByHeight = (focusHeight * 0.5) / Math.tan(vFov / 2);
-    const distanceByWidth = (torsoWidth * 0.5) / Math.tan(hFov / 2);
-    const distance = Math.max(distanceByHeight, distanceByWidth) * 1.03;
+    // 目標占有率:
+    // - 縦: 78% 程度で下余白を抑える
+    // - 横: 62% 程度で横長時の余白を抑える
+    const targetFillY = 0.78;
+    const targetFillX = 0.62;
+    const torsoWidth = fullHeight * 0.64;
+    const distanceByHeight = (focusHeight * 0.5) / (Math.tan(vFov / 2) * targetFillY);
+    const distanceByWidth = (torsoWidth * 0.5) / (Math.tan(hFov / 2) * targetFillX);
+    const distance = Math.max(distanceByHeight, distanceByWidth) * 1.01;
 
-    camera.position.set(0, focusCenterY + fullHeight * 0.16, distance);
+    camera.position.set(0, focusCenterY + fullHeight * 0.09, distance);
     camera.near = Math.max(distance / 100, 0.01);
     camera.far = distance * 100;
     camera.updateProjectionMatrix();
-    cameraTarget.set(0, focusCenterY + fullHeight * 0.12, 0);
+    cameraTarget.set(0, focusCenterY + fullHeight * 0.07, 0);
     camera.lookAt(cameraTarget);
 }
 
