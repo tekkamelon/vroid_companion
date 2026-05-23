@@ -1,42 +1,192 @@
 'use strict';
 
-// Electronのメインプロセス
-// ウィンドウ管理とレンダラープロセスの起動を担当する
-
 const { app, BrowserWindow, ipcMain } = require('electron');
+const { spawn } = require('child_process');
 const path = require('path');
+const fs = require('fs');
+const { parse: parseToml } = require('smol-toml');
+const { randomUUID } = require('crypto');
 
-// メインウィンドウの参照を保持するグローバル変数
+// ---- 設定読み込み ----
+function loadConfig() {
+  const cfgPath = path.join(__dirname, '..', 'config', 'companion.toml');
+  return parseToml(fs.readFileSync(cfgPath, 'utf8'));
+}
+
+// ---- ACPクライアント ----
+class AcpClient {
+  constructor(command, args = []) {
+    this._proc = null;
+    this._buf = '';
+    this._pending = new Map(); // id -> { resolve, reject }
+    this._onUpdate = null;
+    this._command = command;
+    this._args = args;
+    this._sessionId = null;
+    this._nextId = 1;
+  }
+
+  start() {
+    this._proc = spawn(this._command, this._args, {
+      stdio: ['pipe', 'pipe', 'inherit'],
+    });
+    this._proc.stdout.on('data', (chunk) => {
+      // \r を除去してから改行で分割 (ACP line-buffering quirk)
+      this._buf += chunk.toString().replace(/\r/g, '');
+      const lines = this._buf.split('\n');
+      this._buf = lines.pop(); // 未完の行を保持
+      for (const line of lines) {
+        if (line.trim()) this._handleLine(line);
+      }
+    });
+    this._proc.on('exit', (code) => {
+      console.log('[ACP] agent exited: ' + code);
+    });
+  }
+
+  _handleLine(line) {
+    let msg;
+    try {
+      msg = JSON.parse(line);
+    } catch {
+      return;
+    }
+
+    if (msg.method === 'session/update' && this._onUpdate) {
+      this._onUpdate(msg.params);
+      return;
+    }
+    if (msg.method === 'session/request_permission') {
+      this._send({
+        jsonrpc: '2.0',
+        id: msg.id,
+        result: {
+          outcome: {
+            selected: {
+              optionId: 'allow',
+            },
+          },
+        },
+      });
+      return;
+    }
+    if (msg.id !== undefined && this._pending.has(msg.id)) {
+      const { resolve, reject } = this._pending.get(msg.id);
+      this._pending.delete(msg.id);
+      if (msg.error) reject(new Error(msg.error.message));
+      else resolve(msg.result);
+    }
+  }
+
+  _send(obj) {
+    if (!this._proc || this._proc.stdin.destroyed) return;
+    this._proc.stdin.write(JSON.stringify(obj) + '\n');
+  }
+
+  _request(method, params) {
+    const id = this._nextId++;
+    return new Promise((resolve, reject) => {
+      this._pending.set(id, { resolve, reject });
+      this._send({ jsonrpc: '2.0', id, method, params });
+    });
+  }
+
+  async initialize() {
+    return this._request('initialize', {
+      protocolVersion: 1,
+      clientInfo: { name: 'vroid-companion', version: '0.1.0' },
+      clientCapabilities: {},
+    });
+  }
+
+  async newSession(cwd) {
+    const result = await this._request('session/new', { cwd, mcpServers: [] });
+    this._sessionId = result.sessionId;
+    return result;
+  }
+
+  async prompt(text, onChunk) {
+    const chunks = [];
+    this._onUpdate = (params) => {
+      const chunk = params?.update?.agentMessageChunk?.content?.text;
+      if (chunk) {
+        chunks.push(chunk);
+        if (onChunk) onChunk(chunk);
+      }
+    };
+    await this._request('session/prompt', {
+      sessionId: this._sessionId,
+      messageId: randomUUID(),
+      prompt: [{ type: 'text', text }],
+    });
+    this._onUpdate = null;
+    return chunks.join('');
+  }
+
+  stop() {
+    if (this._proc) this._proc.kill();
+  }
+}
+
+// ---- グローバルクライアント ----
+let acpClient = null;
+
+async function initAcp() {
+  const config = loadConfig();
+  const cmd = config.agent?.command;
+  const args = config.agent?.args ?? [];
+  const cwd = config.agent?.cwd ?? process.env.HOME ?? '/tmp';
+
+  if (!cmd) {
+    console.error('[ACP] agent.command not set in config/companion.toml');
+    return;
+  }
+
+  acpClient = new AcpClient(cmd, args);
+  acpClient.start();
+  await acpClient.initialize();
+  await acpClient.newSession(cwd);
+  console.log('[ACP] ready');
+}
+
+// ---- IPC ----
+ipcMain.handle('acp:send', async (_event, text) => {
+  if (!acpClient) throw new Error('ACP client not initialized');
+  const rawText = await acpClient.prompt(text, (chunk) => {
+    if (mainWindow) {
+      mainWindow.webContents.send('acp:chunk', chunk);
+    }
+  });
+  return rawText;
+});
+
+ipcMain.handle('config:get', async () => {
+  return loadConfig();
+});
+
+// ---- ウィンドウ ----
 let mainWindow;
-
-// メインウィンドウを作成する関数
 function createWindow() {
-  // BrowserWindow を作成して設定する
   mainWindow = new BrowserWindow({
     width: 800,
     height: 900,
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),
-      // レンダラーから直接Node APIを触れないように分離する
       contextIsolation: true,
-      // Node.js integration を無効化してセキュリティを高める
       nodeIntegration: false,
     },
     title: 'VRoid Companion',
     backgroundColor: '#1a1a2e',
   });
 
-  // レンダラー画面の読み込み完了時にログを出力する
   mainWindow.webContents.on('did-finish-load', () => {
     console.log('[main] renderer finished load');
   });
 
-  // レンダラー画面の読み込み失敗時にログを出力する
   mainWindow.webContents.on('did-fail-load', (_event, errorCode, errorDescription) => {
-    console.log(`[main] renderer failed load: ${errorCode} ${errorDescription}`);
+    console.log('[main] renderer failed load: ' + errorCode + ' ' + errorDescription);
   });
 
-  // Linux環境でのみGPU関連の設定値をデバッグ出力する
   if (process.platform === 'linux') {
     console.log('[main] gpu switches', {
       ozone: app.commandLine.getSwitchValue('ozone-platform'),
@@ -49,13 +199,15 @@ function createWindow() {
     });
   }
 
-  // レンダラーHTMLを読み込む
   mainWindow.loadFile(path.join(__dirname, 'renderer', 'index.html'));
 }
 
-// Electronの準備が完了したらウィンドウを開く
-app.whenReady().then(createWindow);
+app.whenReady().then(async () => {
+  await initAcp();
+  createWindow();
+});
 
-// すべてのウィンドウが閉じられたらアプリケーションを終了する
-// macOSではドックアイコンが残るため終了しない
-app.on('window-all-closed', () => { if (process.platform !== 'darwin') app.quit(); });
+app.on('window-all-closed', () => {
+  if (acpClient) acpClient.stop();
+  if (process.platform !== 'darwin') app.quit();
+});

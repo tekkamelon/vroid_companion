@@ -1,14 +1,20 @@
 # VRoid Companion 設定ファイル
 
 [agent]
-# zeroclawのgateway REST APIエンドポイント
-# (ACPサーバモードが実装されるまではgateway経由を使用)
-gateway_url = "http://localhost:8080"
-# セッションキー (複数クライアントで共有する場合に指定)
-session_key = ""
+# ACPサーバとして動作するエージェントの起動コマンドと引数
+# zeroclaw の場合:
+command = "opencode"
+args    = ["acp"]
+# opencode の場合:
+# command = "opencode"
+# args    = []
+# goose の場合:
+# command = "goose"
+# args    = ["--acp"]  # 要確認
+cwd = "/home/yourname"  # エージェントのワーキングディレクトリ (絶対パス)
 
 [model]
-# VRMファイルのパス (絶対パスまたはassets/models/からの相対)
+# VRMファイルのパス (assets/models/からの相対パス)
 vrm_path = "assets/models/model.vrm"
 
 [display]
