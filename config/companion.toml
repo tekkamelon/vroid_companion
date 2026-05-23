@@ -3,7 +3,7 @@
 [agent]
 # ACPサーバとして動作するエージェントの起動コマンドと引数
 # zeroclaw の場合:
-command = "opencode"
+command = "kilocode"
 args    = ["acp"]
 # opencode の場合:
 # command = "opencode"

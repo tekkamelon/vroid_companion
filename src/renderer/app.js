@@ -281,9 +281,26 @@ async function sendMessage() {
     // ストリーミング表示用に空のAIメッセージを事前追加
     appendLog('AI', '');
 
-    const rawText = await window.companion.sendMessage(text);
-    const parsed = parseAgentResponse(rawText);
-    if (parsed.emotion) setExpression(parsed.emotion.name, parsed.emotion.intensity);
+    try {
+        const rawText = await window.companion.sendMessage(text);
+        console.log('[app] response length:', rawText?.length ?? 0);
+        const parsed = parseAgentResponse(rawText);
+        // ストリーミング完了後、感情タグを除いた最終テキストで上書き
+        const entries = log.querySelectorAll('p[data-who="AI"]');
+        if (entries.length > 0) {
+            const last = entries[entries.length - 1];
+            last.textContent = '[AI] ' + parsed.text;
+        } else if (parsed.text) {
+            appendLog('AI', parsed.text);
+        }
+        if (parsed.emotion) {
+            setExpression(parsed.emotion.name, parsed.emotion.intensity);
+            console.log('[app] emotion:', parsed.emotion.name, parsed.emotion.intensity);
+        }
+    } catch (err) {
+        console.error('[app] sendMessage error:', err);
+        appendLog('AI', 'Error: ' + err.message);
+    }
 }
 
 // 送信ボタンのクリックイベントを設定する

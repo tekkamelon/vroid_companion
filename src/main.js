@@ -27,6 +27,7 @@ class AcpClient {
   }
 
   start() {
+    console.log('[ACP] spawning:', this._command, this._args);
     this._proc = spawn(this._command, this._args, {
       stdio: ['pipe', 'pipe', 'inherit'],
     });
@@ -45,10 +46,12 @@ class AcpClient {
   }
 
   _handleLine(line) {
+    console.log('[ACP] <=', line.substring(0, 200));
     let msg;
     try {
       msg = JSON.parse(line);
     } catch {
+      console.log('[ACP] failed to parse line');
       return;
     }
 
@@ -105,10 +108,31 @@ class AcpClient {
     return result;
   }
 
+  _extractChunk(params) {
+    // 複数のACP実装に対応したチャンク抽出
+    const u = params?.update;
+    if (!u) return null;
+
+    // Pattern A: spec-compliant agentMessageChunk.content.text
+    if (u.agentMessageChunk?.content?.text) return u.agentMessageChunk.content.text;
+    // Pattern B: snake_case
+    if (u.agent_message_chunk?.content?.text) return u.agent_message_chunk.content.text;
+    // Pattern C: content.text
+    if (u.content?.text) return u.content.text;
+    // Pattern D: content as string
+    if (typeof u.content === 'string') return u.content;
+    // Pattern E: messageChunk.text
+    if (u.messageChunk?.text) return u.messageChunk.text;
+    // Pattern F: sessionUpdate agent_message_chunk content.text
+    if (u.sessionUpdate === 'agent_message_chunk' && u.content?.text) return u.content.text;
+
+    return null;
+  }
+
   async prompt(text, onChunk) {
     const chunks = [];
     this._onUpdate = (params) => {
-      const chunk = params?.update?.agentMessageChunk?.content?.text;
+      const chunk = this._extractChunk(params);
       if (chunk) {
         chunks.push(chunk);
         if (onChunk) onChunk(chunk);
@@ -152,11 +176,16 @@ async function initAcp() {
 // ---- IPC ----
 ipcMain.handle('acp:send', async (_event, text) => {
   if (!acpClient) throw new Error('ACP client not initialized');
+  console.log('[IPC] acp:send received, length:', text?.length ?? 0);
+  
   const rawText = await acpClient.prompt(text, (chunk) => {
-    if (mainWindow) {
+    console.log('[IPC] streaming chunk length:', chunk?.length ?? 0);
+    if (mainWindow && !mainWindow.isDestroyed()) {
       mainWindow.webContents.send('acp:chunk', chunk);
     }
   });
+  
+  console.log('[IPC] acp:send complete, response length:', rawText?.length ?? 0);
   return rawText;
 });
 
