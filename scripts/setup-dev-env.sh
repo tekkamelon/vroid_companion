@@ -24,7 +24,7 @@ check_os() {
     fi
     . /etc/os-release
     case "$ID $VERSION_ID" in
-        "ubuntu 24.04" | "pop 24.04") log "OS確認OK: $PRETTY_NAME" ;;
+        "ubuntu 24.04" | "pop 24.04" | "debian 13") log "OS確認OK: $PRETTY_NAME" ;;
         *) warn "未確認のOS: $PRETTY_NAME。続行しますが動作は保証されません。" ;;
     esac
 }
@@ -48,10 +48,13 @@ install_fnm() {
     # シェルに応じて設定ファイルを更新
     SHELL_RC=""
     case "${SHELL:-}" in
-        */bash) SHELL_RC="$HOME/.bashrc" ;;
-        */zsh)  SHELL_RC="$HOME/.zshrc" ;;
-        */fish) SHELL_RC="$HOME/.config/fish/config.fish" ;;
-        *)      SHELL_RC="$HOME/.profile" ;;
+        */bash)  SHELL_RC="$HOME/.bashrc" ;;
+        */zsh)   SHELL_RC="$HOME/.zshrc" ;;
+        */fish)  SHELL_RC="$HOME/.config/fish/config.fish" ;;
+        */mksh)  SHELL_RC="$HOME/.mkshrc" ;;
+        */ksh)   SHELL_RC="$HOME/.kshrc" ;;
+        */yash)  SHELL_RC="$HOME/.yashrc" ;;
+        *)       SHELL_RC="$HOME/.profile" ;;
     esac
     log "fnm の初期化を $SHELL_RC に追記しています..."
     if ! grep -q 'fnm env' "$SHELL_RC" 2>/dev/null; then
@@ -116,7 +119,7 @@ install_system_deps() {
 # --------------------------------------------------------------------------
 # プロジェクト初期化
 # --------------------------------------------------------------------------
-PROJECT_DIR="${1:-$HOME/projects/vroid-companion}"
+PROJECT_DIR="${1:-$PWD}"
 
 init_project() {
     if [ -d "$PROJECT_DIR" ]; then
