@@ -1,70 +1,103 @@
 #!/bin/sh
 # VRoid AIコンパニオン (vroid-companion) 開発環境セットアップスクリプト
-# 対象OS: Pop!_OS 24.04 LTS (Ubuntu 24.04ベース)
-# 作成日: 2026-05-19
+# 対象OS: Pop!_OS 24.04 LTS (Ubuntu 24.04ベース), Debian 13
 set -eu
 
 # --------------------------------------------------------------------------
-# ユーティリティ
+# 変数の宣言
 # --------------------------------------------------------------------------
-log()  { printf '\033[1;32m[INFO]\033[0m  %s\n' "$*"; }
-warn() { printf '\033[1;33m[WARN]\033[0m  %s\n' "$*"; }
-die()  { printf '\033[1;31m[ERROR]\033[0m %s\n' "$*" >&2; exit 1; }
+PROJECT_DIR=""
 
-require_cmd() {
-    command -v "$1" > /dev/null 2>&1 || die "コマンドが見つかりません: $1"
+# --------------------------------------------------------------------------
+# 関数の宣言
+# --------------------------------------------------------------------------
+
+# 情報メッセージの出力
+log() {
+
+    printf '\033[1;32m[INFO]\033[0m  %s\n' "$*"
+
 }
 
-# --------------------------------------------------------------------------
-# 前提チェック
-# --------------------------------------------------------------------------
+# 警告メッセージの出力
+warn() {
+
+    printf '\033[1;33m[WARN]\033[0m  %s\n' "$*"
+
+}
+
+# エラーメッセージの出力と終了
+die() {
+
+    printf '\033[1;31m[ERROR]\033[0m %s\n' "$*" >&2
+    exit 1
+
+}
+
+# OSの確認
 check_os() {
+
     if [ ! -f /etc/os-release ]; then
         die "/etc/os-release が見つかりません。Ubuntu/Pop!_OS 24.04 上で実行してください。"
     fi
+
     . /etc/os-release
-    case "$ID $VERSION_ID" in
-        "ubuntu 24.04" | "pop 24.04" | "debian 13") log "OS確認OK: $PRETTY_NAME" ;;
-        *) warn "未確認のOS: $PRETTY_NAME。続行しますが動作は保証されません。" ;;
+
+    case "${ID} ${VERSION_ID}" in
+        "ubuntu 24.04" | "pop 24.04" | "debian 13")
+            log "OS確認OK: ${PRETTY_NAME}"
+            ;;
+        *)
+            warn "未確認のOS: ${PRETTY_NAME}。続行しますが動作は保証されません。"
+            ;;
     esac
+
 }
 
+# root実行の防止
 check_not_root() {
+
     if [ "$(id -u)" -eq 0 ]; then
         die "rootで実行しないでください。sudoが必要な箇所は自動的に呼び出します。"
     fi
+
 }
 
-# --------------------------------------------------------------------------
-# Node.js (fnm 経由)
-# --------------------------------------------------------------------------
+# fnmのインストール
 install_fnm() {
+
     if command -v fnm > /dev/null 2>&1; then
         log "fnm は既にインストール済みです: $(fnm --version)"
         return 0
     fi
+
     log "fnm (Fast Node Manager) をインストールしています..."
     curl -fsSL https://fnm.vercel.app/install | sh
-    # シェルに応じて設定ファイルを更新
-    SHELL_RC=""
+
+    shell_rc=""
     case "${SHELL:-}" in
-        */bash)  SHELL_RC="$HOME/.bashrc" ;;
-        */zsh)   SHELL_RC="$HOME/.zshrc" ;;
-        */fish)  SHELL_RC="$HOME/.config/fish/config.fish" ;;
-        */mksh)  SHELL_RC="$HOME/.mkshrc" ;;
-        */ksh)   SHELL_RC="$HOME/.kshrc" ;;
-        */yash)  SHELL_RC="$HOME/.yashrc" ;;
-        *)       SHELL_RC="$HOME/.profile" ;;
+        */bash)  shell_rc="${HOME}/.bashrc" ;;
+        */zsh)   shell_rc="${HOME}/.zshrc" ;;
+        */fish)  shell_rc="${HOME}/.config/fish/config.fish" ;;
+        */mksh)  shell_rc="${HOME}/.mkshrc" ;;
+        */ksh)   shell_rc="${HOME}/.kshrc" ;;
+        */yash)  shell_rc="${HOME}/.yashrc" ;;
+        *)       shell_rc="${HOME}/.profile" ;;
     esac
-    log "fnm の初期化を $SHELL_RC に追記しています..."
-    if ! grep -q 'fnm env' "$SHELL_RC" 2>/dev/null; then
-        printf '\n# fnm\nexport PATH="$HOME/.local/share/fnm:$PATH"\neval "$(fnm env --use-on-cd)"\n' >> "$SHELL_RC"
+
+    log "fnm の初期化を ${shell_rc} に追記しています..."
+    if ! grep -F 'fnm env' "${shell_rc}" > /dev/null 2>&1; then
+        printf '\n# fnm\nexport PATH="%s/.local/share/fnm:${PATH}"\neval "$(fnm env --use-on-cd)"\n' "${HOME}" >> "${shell_rc}"
     fi
-    export PATH="$HOME/.local/share/fnm:$PATH"
+
+    export PATH="${HOME}/.local/share/fnm:${PATH}"
     eval "$(fnm env --use-on-cd 2>/dev/null || true)"
+
 }
 
+# Node.js LTSのインストール
 install_node() {
+
     log "Node.js LTS (v22系) をインストールしています..."
     fnm install "lts-latest"
     fnm use "lts-latest"
@@ -72,25 +105,26 @@ install_node() {
     node --version
     npm --version
     log "Node.js インストール完了"
+
 }
 
-# --------------------------------------------------------------------------
-# Git (通常は入っているが念のため)
-# --------------------------------------------------------------------------
+# gitのインストール
 install_git() {
+
     if command -v git > /dev/null 2>&1; then
         log "git は既にインストール済みです: $(git --version)"
         return 0
     fi
+
     log "git をインストールしています..."
     sudo apt-get update -qq
     sudo apt-get install -y git
+
 }
 
-# --------------------------------------------------------------------------
-# システム依存ライブラリ (Electron実行に必要)
-# --------------------------------------------------------------------------
+# システム依存ライブラリのインストール
 install_system_deps() {
+
     log "Electronのシステム依存ライブラリをインストールしています..."
     sudo apt-get update -qq
     sudo apt-get install -y \
@@ -114,25 +148,22 @@ install_system_deps() {
         build-essential \
         shellcheck
     log "システム依存ライブラリのインストール完了"
+
 }
 
-# --------------------------------------------------------------------------
-# プロジェクト初期化
-# --------------------------------------------------------------------------
-PROJECT_DIR="${1:-$PWD}"
-
+# プロジェクトの初期化
 init_project() {
-    if [ -d "$PROJECT_DIR" ]; then
-        warn "ディレクトリが既に存在します: $PROJECT_DIR"
+
+    if [ -d "${PROJECT_DIR}" ]; then
+        warn "ディレクトリが既に存在します: ${PROJECT_DIR}"
         warn "スキップします。クリーンインストールの場合は手動で削除してください。"
         return 0
     fi
 
-    log "プロジェクトディレクトリを作成しています: $PROJECT_DIR"
-    mkdir -p "$PROJECT_DIR"
-    cd "$PROJECT_DIR"
+    log "プロジェクトディレクトリを作成しています: ${PROJECT_DIR}"
+    mkdir -p "${PROJECT_DIR}"
+    cd "${PROJECT_DIR}" || die "ディレクトリへの移動失敗: ${PROJECT_DIR}"
 
-    # package.json
     cat > package.json << 'PKGJSON'
 {
   "name": "vroid-companion",
@@ -162,10 +193,8 @@ init_project() {
 }
 PKGJSON
 
-    # ディレクトリ構造
     mkdir -p src/renderer src/assets/models config
 
-    # メインプロセス (src/main.js) — 最小骨格
     cat > src/main.js << 'MAINJS'
 'use strict';
 
@@ -193,7 +222,6 @@ app.whenReady().then(createWindow);
 app.on('window-all-closed', () => { if (process.platform !== 'darwin') app.quit(); });
 MAINJS
 
-    # プリロード (src/preload.js)
     cat > src/preload.js << 'PRELOAD'
 'use strict';
 
@@ -205,7 +233,6 @@ contextBridge.exposeInMainWorld('companion', {
 });
 PRELOAD
 
-    # レンダラー (src/renderer/index.html) — 最小UI
     cat > src/renderer/index.html << 'HTML'
 <!DOCTYPE html>
 <html lang="ja">
@@ -240,7 +267,6 @@ PRELOAD
 </html>
 HTML
 
-    # レンダラーJS (src/renderer/app.js) — 骨格のみ
     cat > src/renderer/app.js << 'APPJS'
 // VRoid Companion — レンダラープロセス
 // three.js + @pixiv/three-vrm はnpmからbundleせず、
@@ -332,7 +358,6 @@ window.companion.onResponse((data) => {
 // loadVrm('./assets/models/model.vrm');
 APPJS
 
-    # 設定ファイル雛形
     cat > config/companion.toml << 'TOML'
 # VRoid Companion 設定ファイル
 
@@ -355,22 +380,24 @@ TOML
     log "npm install を実行しています..."
     npm install
 
-    log "プロジェクト初期化完了: $PROJECT_DIR"
+    log "プロジェクト初期化完了: ${PROJECT_DIR}"
+
 }
 
-# --------------------------------------------------------------------------
-# .nvmrc / .node-version (fnm自動切り替え用)
-# --------------------------------------------------------------------------
+# .node-versionファイルの作成
 write_node_version() {
-    cd "$PROJECT_DIR"
+
+    cd "${PROJECT_DIR}" || die "ディレクトリへの移動失敗: ${PROJECT_DIR}"
     node --version | sed 's/^v//' > .node-version
     log ".node-version を作成しました: $(cat .node-version)"
+
 }
 
-# --------------------------------------------------------------------------
-# メイン
-# --------------------------------------------------------------------------
+# メイン処理
 main() {
+
+    PROJECT_DIR="${1:-${PWD}}"
+
     log "=== vroid-companion 開発環境セットアップ開始 ==="
     check_not_root
     check_os
@@ -386,10 +413,15 @@ main() {
     log ""
     log "次のステップ:"
     log "  1. シェルを再起動 (または 'source ~/.bashrc') してfnmを有効化"
-    log "  2. cd $PROJECT_DIR"
+    log "  2. cd ${PROJECT_DIR}"
     log "  3. VRMモデルを src/assets/models/model.vrm に配置"
     log "  4. config/companion.toml でzeroclawのエンドポイントを設定"
     log "  5. npm start で起動"
+
 }
+
+# --------------------------------------------------------------------------
+# 関数の宣言ここまで
+# --------------------------------------------------------------------------
 
 main "$@"
