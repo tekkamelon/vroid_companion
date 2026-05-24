@@ -371,8 +371,53 @@ window.companion.onChunk((text) => appendToLastMessage(text));
 
 ### Phase 5: TTS + リップシンク (オプション)
 
-TTS: Style-Bert-VITS2 をローカルREST APIとして起動し、返答テキストをPOST → WAV受信  
-リップシンク: Web Audio APIでRMSを取得し `aa` 表情のintensityに写像
+#### Phase 5a: OpenAI TTS API（推奨・最初に実装）
+
+最小構成で動作させるため、OpenAI TTS API を利用する。
+
+```js
+// src/main.js（または専用モジュール）
+async function synthesizeSpeech(text, apiKey) {
+    const response = await fetch('https://api.openai.com/v1/audio/speech', {
+        method: 'POST',
+        headers: {
+            'Authorization': `Bearer ${apiKey}`,
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+            model: 'tts-1',
+            input: text,
+            voice: 'alloy', // 日本語対応: alloy, echo, fable, onyx, nova, shimmer
+            response_format: 'mp3',
+        }),
+    });
+    if (!response.ok) throw new Error(`TTS failed: ${response.status}`);
+    const buffer = Buffer.from(await response.arrayBuffer());
+    return buffer; // renderer に渡して Audio 要素または Web Audio API で再生
+}
+```
+
+設定 (`config/companion.toml`) に `tts.provider = "openai"` と `tts.api_key` を追加。
+
+#### Phase 5b: リップシンク（RMS → `aa`）
+
+Web Audio API で音声バッファの RMS を取得し、VRM の `aa` 表情に写像する。
+
+```js
+// src/renderer/app.js
+function updateLipSync(audioAnalyser, deltaTime) {
+    if (!audioAnalyser || !currentVrm?.expressionManager) return;
+    const dataArray = new Uint8Array(audioAnalyser.frequencyBinCount);
+    audioAnalyser.getByteFrequencyData(dataArray);
+    const rms = Math.sqrt(dataArray.reduce((a, b) => a + b * b, 0) / dataArray.length);
+    const intensity = Math.min(1, rms / 128); // 128 で正規化（要調整）
+    currentVrm.expressionManager.setValue('aa', intensity);
+}
+```
+
+#### Phase 5c: Style-Bert-VITS2（オプション・上級者向け）
+
+ローカルで voice quality を完全にカスタマイズしたい場合、Style-Bert-VITS2 の推論サーバーを起動し、`http://localhost:5000/` に POST する実装に差し替える。実装パターンは Phase 5a と同じ（入力テキスト → 音声バイナリ取得 → 再生 → リップシンク）なので、TTS プロバイダーの抽象化層を作って差し替え可能にする。
 
 ---
 
