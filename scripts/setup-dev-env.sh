@@ -41,6 +41,7 @@ check_os() {
         die "/etc/os-release が見つかりません。Ubuntu/Pop!_OS 24.04 上で実行してください。"
     fi
 
+    # shellcheck source=/dev/null
     . /etc/os-release
 
     case "${ID} ${VERSION_ID}" in
@@ -87,6 +88,8 @@ install_fnm() {
 
     log "fnm の初期化を ${shell_rc} に追記しています..."
     if ! grep -F 'fnm env' "${shell_rc}" > /dev/null 2>&1; then
+		# .bashrc 等に ${PATH} と $(fnm env) をそのまま文字列として書き込むためシングルクォートを使用(このスクリプト実行時に展開させない)
+        # shellcheck disable=SC2016
         printf '\n# fnm\nexport PATH="%s/.local/share/fnm:${PATH}"\neval "$(fnm env --use-on-cd)"\n' "${HOME}" >> "${shell_rc}"
     fi
 
