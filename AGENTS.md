@@ -24,7 +24,7 @@ Electron app that displays a VRoid Studio VRM model in a window, relays text inp
 | @pixiv/three-vrm | ^3.5.2 |
 | VRM format | VRM 1.0 (VRoid Studio 2.x default) |
 | Agent protocol | ACP v1 (JSON-RPC 2.0 over stdio, NDJSON lines) |
-| Config | `config/companion.toml` (TOML) |
+| Config | `config/config.toml` (TOML) |
 
 ---
 
@@ -47,7 +47,7 @@ src/main.js          Electron main process + ACP client lifecycle
 src/preload.js       contextBridge exposing window.companion.*
 src/renderer/app.js  Three.js scene, VRM load, chat UI, emotion control
 src/renderer/index.html  Renderer page with CSP
-config/companion.toml    Runtime config (agent command, VRM path, display size)
+config/config.toml       Runtime config (agent command, VRM path, display size)
 ```
 
 ### IPC exposed via preload
@@ -111,7 +111,7 @@ If rendering is garbled on Wayland, run with `--ozone-platform=x11`.
 
 1. Node.js v22 via fnm (setup script: `scripts/setup-dev-env.sh` bootstraps fnm + Node + system deps).
 2. Place a VRM 1.0 model into `src/assets/models/model.vrm`.
-3. Configure the agent command in `config/companion.toml`.
+3. Configure the agent command in `config/config.toml`.
 4. `npm install`, then `npm start`.
 
 ---

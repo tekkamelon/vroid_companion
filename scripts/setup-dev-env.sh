@@ -361,7 +361,7 @@ window.companion.onResponse((data) => {
 // loadVrm('./assets/models/model.vrm');
 APPJS
 
-    cat > config/companion.toml << 'TOML'
+    cat > config/config.toml << 'TOML'
 # VRoid Companion 設定ファイル
 
 [agent]
@@ -418,7 +418,7 @@ main() {
     log "  1. シェルを再起動 (または 'source ~/.bashrc') してfnmを有効化"
     log "  2. cd ${PROJECT_DIR}"
     log "  3. VRMモデルを src/assets/models/model.vrm に配置"
-    log "  4. config/companion.toml でzeroclawのエンドポイントを設定"
+    log "  4. config/config.toml でzeroclawのエンドポイントを設定"
     log "  5. npm start で起動"
 
 }

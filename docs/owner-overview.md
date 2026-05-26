@@ -71,7 +71,7 @@ echo '{"jsonrpc":"2.0","method":"initialize","params":{},"id":1}' | zeroclaw acp
 | goose | `goose` (ACP対応モード) |
 | その他 | ACP仕様準拠エージェントであれば追加可能 |
 
-`config/companion.toml`に起動コマンドを書くだけで切り替えられます。
+`config/config.toml`に起動コマンドを書くだけで切り替えられます。
 
 ---
 

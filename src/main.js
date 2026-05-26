@@ -9,7 +9,7 @@ const { randomUUID } = require('crypto');
 
 // ---- 設定読み込み ----
 function loadConfig() {
-  const cfgPath = path.join(__dirname, '..', 'config', 'companion.toml');
+  const cfgPath = path.join(__dirname, '..', 'config', 'config.toml');
   return parseToml(fs.readFileSync(cfgPath, 'utf8'));
 }
 
@@ -162,7 +162,7 @@ async function initAcp() {
   const cwd = config.agent?.cwd ?? process.env.HOME ?? '/tmp';
 
   if (!cmd) {
-    console.error('[ACP] agent.command not set in config/companion.toml');
+    console.error('[ACP] agent.command not set in config/config.toml');
     return;
   }
 

@@ -143,7 +143,7 @@ const { randomUUID } = require('crypto');
 
 // ---- 設定読み込み ----
 function loadConfig() {
-    const cfgPath = path.join(__dirname, '..', 'config', 'companion.toml');
+    const cfgPath = path.join(__dirname, '..', 'config', 'config.toml');
     return parseToml(fs.readFileSync(cfgPath, 'utf8'));
 }
 
@@ -296,7 +296,7 @@ app.on('window-all-closed', () => {
 });
 ```
 
-**設定ファイル `config/companion.toml` の対応するフィールド:**
+**設定ファイル `config/config.toml` の対応するフィールド:**
 ```toml
 [agent]
 command = "zeroclaw"
@@ -397,7 +397,7 @@ async function synthesizeSpeech(text, apiKey) {
 }
 ```
 
-設定 (`config/companion.toml`) に `tts.provider = "openai"` と `tts.api_key` を追加。
+設定 (`config/config.toml`) に `tts.provider = "openai"` と `tts.api_key` を追加。
 
 #### Phase 5b: リップシンク（RMS → `aa`）
 
@@ -464,7 +464,7 @@ webPreferences: {
 |---|---|---|
 | VRMが表示されない | loadVrm() 未呼び出し or パス誤り | コンソールのGLTFLoaderエラーを確認 |
 | 表情が変わらない | expressionManagerがnull or キー名誤り | VRM 1.0はexpressionManager、0.xはblendShapeProxy |
-| ACPが応答しない | エージェントが起動していない or コマンド誤り | `config/companion.toml`のcommand/argsを確認 |
+| ACPが応答しない | エージェントが起動していない or コマンド誤り | `config/config.toml`のcommand/argsを確認 |
 | 行が来ない | エージェントが\rを使う場合 | `chunk.toString().replace(/\r/g, '')` でトリム |
 | Waylandで描画乱れ | Electronデフォルト | `--ozone-platform=x11` フラグを追加 |
 | SpringBoneが動かない | vrm.update() を呼んでいない | レンダーループ内で毎フレーム呼ぶ |
@@ -472,7 +472,7 @@ webPreferences: {
 
 ---
 
-## 設定ファイル (config/companion.toml)
+## 設定ファイル (config/config.toml)
 
 ```toml
 [agent]
