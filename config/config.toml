@@ -23,3 +23,12 @@ vrm_path = "assets/models/model.vrm"
 [display]
 width  = 800
 height = 900
+
+[tts]
+enabled = false
+provider = "openai"
+model = "tts-1"
+voice = "alloy"
+response_format = "mp3"
+# api_key は推奨: 環境変数 OPENAI_API_KEY
+# api_key = "sk-..."
