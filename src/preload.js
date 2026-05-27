@@ -15,4 +15,6 @@ contextBridge.exposeInMainWorld('companion', {
   onResponse:  (cb)   => ipcRenderer.on('acp:response', (_e, data) => cb(data)),
   // 設定を取得する
   getConfig:   ()     => ipcRenderer.invoke('config:get'),
+  // TTS 音声を生成する (Phase 5a)
+  synthesizeSpeech: (text) => ipcRenderer.invoke('tts:synthesize', text),
 });
