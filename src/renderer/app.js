@@ -247,6 +247,24 @@ function setExpression(name, intensity) {
     }
 }
 
+async function playTts(text) {
+    if (!text) return;
+    try {
+        const result = await window.companion.synthesizeSpeech(text);
+        if (!result || result.disabled || !result.audioBase64) return;
+
+        const bytes = Uint8Array.from(atob(result.audioBase64), (c) => c.charCodeAt(0));
+        const blob = new Blob([bytes], { type: result.mimeType ?? 'audio/mpeg' });
+        const url = URL.createObjectURL(blob);
+        const audio = new Audio(url);
+        audio.addEventListener('ended', () => URL.revokeObjectURL(url), { once: true });
+        audio.addEventListener('error', () => URL.revokeObjectURL(url), { once: true });
+        await audio.play();
+    } catch (err) {
+        console.warn('[TTS] playback skipped:', err?.message ?? err);
+    }
+}
+
 // ---- デバッグ用: DevTools Console からテストできるように公開 ----
 window.parseAgentResponse = parseAgentResponse;
 window.setExpression = setExpression;
@@ -301,6 +319,7 @@ async function sendMessage() {
             setExpression(parsed.emotion.name, parsed.emotion.intensity);
             console.log('[app] emotion:', parsed.emotion.name, parsed.emotion.intensity);
         }
+        await playTts(parsed.text);
     } catch (err) {
         console.error('[app] sendMessage error:', err);
         appendLog('AI', 'Error: ' + err.message);
