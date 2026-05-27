@@ -193,6 +193,56 @@ ipcMain.handle('config:get', async () => {
   return loadConfig();
 });
 
+async function synthesizeSpeech(text, ttsConfig) {
+  const apiKey = ttsConfig?.api_key || process.env.OPENAI_API_KEY;
+  if (!apiKey) {
+    throw new Error('TTS api_key is missing (config.tts.api_key or OPENAI_API_KEY)');
+  }
+
+  const model = ttsConfig?.model ?? 'tts-1';
+  const voice = ttsConfig?.voice ?? 'alloy';
+  const responseFormat = ttsConfig?.response_format ?? 'mp3';
+
+  const response = await fetch('https://api.openai.com/v1/audio/speech', {
+    method: 'POST',
+    headers: {
+      Authorization: 'Bearer ' + apiKey,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      model,
+      input: text,
+      voice,
+      response_format: responseFormat,
+    }),
+  });
+
+  if (!response.ok) {
+    const body = await response.text().catch(() => '');
+    throw new Error('TTS failed: ' + response.status + ' ' + body.slice(0, 200));
+  }
+
+  return Buffer.from(await response.arrayBuffer()).toString('base64');
+}
+
+ipcMain.handle('tts:synthesize', async (_event, text) => {
+  const cfg = loadConfig();
+  const ttsCfg = cfg.tts ?? {};
+  if (!ttsCfg.enabled || ttsCfg.provider !== 'openai') {
+    return { disabled: true };
+  }
+  if (typeof text !== 'string' || !text.trim()) {
+    return { disabled: true };
+  }
+
+  const audioBase64 = await synthesizeSpeech(text, ttsCfg);
+  return {
+    disabled: false,
+    mimeType: 'audio/mpeg',
+    audioBase64,
+  };
+});
+
 // ---- ウィンドウ ----
 let mainWindow;
 function createWindow() {
