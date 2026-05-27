@@ -247,6 +247,10 @@ function setExpression(name, intensity) {
     }
 }
 
+// ---- デバッグ用: DevTools Console からテストできるように公開 ----
+window.parseAgentResponse = parseAgentResponse;
+window.setExpression = setExpression;
+
 // ---- チャットUI ----
 
 // 会話ログにメッセージを追加して自動スクロールする
