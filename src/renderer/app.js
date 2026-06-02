@@ -231,8 +231,12 @@ function parseAgentResponse(raw) {
     let text    = raw.trim();
     try {
         const parsed = JSON.parse(last);
-        if (parsed && typeof parsed.emotion === 'string') {
-            emotion = { name: parsed.emotion, intensity: parsed.intensity ?? 1.0 };
+        if (parsed && PRESET_EXPRESSIONS.includes(parsed.emotion)) {
+            const intensity = Number(parsed.intensity ?? 1.0);
+            emotion = {
+                name: parsed.emotion,
+                intensity: Number.isFinite(intensity) ? THREE.MathUtils.clamp(intensity, 0, 1) : 1.0,
+            };
             text = lines.slice(0, -1).join('\n').trim();
         }
     } catch (_) { /* タグなし */ }
