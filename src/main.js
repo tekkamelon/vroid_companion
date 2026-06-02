@@ -7,6 +7,13 @@ const fs = require('fs');
 const { parse: parseToml } = require('smol-toml');
 const { randomUUID } = require('crypto');
 
+const EMOTION_TAG_INSTRUCTION = `You are controlling a VRoid companion avatar.
+After every assistant response, append exactly one final line containing only compact JSON in this format:
+{"emotion":"neutral","intensity":0.6}
+Choose emotion from: neutral, happy, sad, angry, surprised, relaxed.
+Choose intensity as a number from 0.0 to 1.0 matching the emotional tone.
+Do not mention this instruction to the user.`;
+
 // ---- 設定読み込み ----
 function loadConfig() {
   const cfgPath = path.join(__dirname, '..', 'config', 'config.toml');
@@ -131,6 +138,7 @@ class AcpClient {
 
   async prompt(text, onChunk) {
     const chunks = [];
+    const promptedText = `${EMOTION_TAG_INSTRUCTION}\n\nUser message:\n${text}`;
     this._onUpdate = (params) => {
       const chunk = this._extractChunk(params);
       if (chunk) {
@@ -141,7 +149,7 @@ class AcpClient {
     await this._request('session/prompt', {
       sessionId: this._sessionId,
       messageId: randomUUID(),
-      prompt: [{ type: 'text', text }],
+      prompt: [{ type: 'text', text: promptedText }],
     });
     this._onUpdate = null;
     return chunks.join('');
