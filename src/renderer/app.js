@@ -214,7 +214,10 @@ function animate() {
     resizeRenderer();
     const delta = clock.getDelta();
 
-    if (currentVrm) currentVrm.update(delta);
+    if (currentVrm) {
+        updateExpressionFade(delta);
+        currentVrm.update(delta);
+    }
     renderer.render(scene, camera);
 }
 animate();
@@ -222,6 +225,9 @@ animate();
 // ---- 感情タグパース + 表情制御 (Phase 3) ----
 
 const PRESET_EXPRESSIONS = ['neutral','happy','sad','angry','surprised','relaxed'];
+const EXPRESSION_HOLD_SECONDS = 2.0;
+const EXPRESSION_FADE_SECONDS = 1.5;
+let activeExpression = null;
 
 function parseAgentResponse(raw) {
     if (typeof raw !== 'string') return { text: String(raw), emotion: null };
@@ -245,10 +251,45 @@ function parseAgentResponse(raw) {
 
 function setExpression(name, intensity) {
     if (!currentVrm?.expressionManager) return;
-    PRESET_EXPRESSIONS.forEach(e => currentVrm.expressionManager.setValue(e, 0));
-    if (PRESET_EXPRESSIONS.includes(name)) {
-        currentVrm.expressionManager.setValue(name, Math.min(1, Math.max(0, intensity)));
+    const value = THREE.MathUtils.clamp(Number(intensity ?? 1.0), 0, 1);
+
+    if (name === 'neutral' || !PRESET_EXPRESSIONS.includes(name) || value <= 0) {
+        activeExpression = null;
+        resetExpressions();
+        return;
     }
+
+    activeExpression = { name, intensity: value, elapsed: 0 };
+    applyExpression(name, value);
+}
+
+function resetExpressions() {
+    if (!currentVrm?.expressionManager) return;
+    PRESET_EXPRESSIONS.forEach(e => currentVrm.expressionManager.setValue(e, 0));
+}
+
+function applyExpression(name, intensity) {
+    resetExpressions();
+    currentVrm.expressionManager.setValue(name, intensity);
+}
+
+function updateExpressionFade(delta) {
+    if (!activeExpression || !currentVrm?.expressionManager) return;
+
+    activeExpression.elapsed += delta;
+    if (activeExpression.elapsed <= EXPRESSION_HOLD_SECONDS) return;
+
+    const fadeElapsed = activeExpression.elapsed - EXPRESSION_HOLD_SECONDS;
+    const fadeProgress = THREE.MathUtils.clamp(fadeElapsed / EXPRESSION_FADE_SECONDS, 0, 1);
+    const value = activeExpression.intensity * (1 - fadeProgress);
+
+    if (value <= 0.001) {
+        activeExpression = null;
+        resetExpressions();
+        return;
+    }
+
+    applyExpression(activeExpression.name, value);
 }
 
 async function playTts(text) {
