@@ -273,17 +273,30 @@ window.setExpression = setExpression;
 
 // 会話ログにメッセージを追加して自動スクロールする
 function appendLog(who, text) {
-    const p = document.createElement('p');
-    p.textContent = `[${who}] ${text}`;
-    p.dataset.who = who;
-    log.appendChild(p);
+    const row = document.createElement('div');
+    const bubble = document.createElement('div');
+    bubble.className = 'msg-bubble';
+
+    if (who === 'You') {
+        row.className = 'msg-row user';
+        bubble.textContent = text;
+    } else if (who === 'AI') {
+        row.className = 'msg-row ai';
+        bubble.textContent = text;
+    } else {
+        row.className = 'msg-row system';
+        bubble.textContent = `[${who}] ${text}`;
+    }
+
+    row.appendChild(bubble);
+    log.appendChild(row);
     log.scrollTop = log.scrollHeight;
-    return p;
+    return bubble;
 }
 
 // 最後のAIメッセージに追記する (Phase 4 ストリーミング用)
 function appendToLastMessage(text) {
-    const entries = log.querySelectorAll('p[data-who="AI"]');
+    const entries = log.querySelectorAll('.msg-row.ai .msg-bubble');
     if (entries.length === 0) {
         appendLog('AI', text);
         return;
@@ -308,10 +321,10 @@ async function sendMessage() {
         console.log('[app] response length:', rawText?.length ?? 0);
         const parsed = parseAgentResponse(rawText);
         // ストリーミング完了後、感情タグを除いた最終テキストで上書き
-        const entries = log.querySelectorAll('p[data-who="AI"]');
+        const entries = log.querySelectorAll('.msg-row.ai .msg-bubble');
         if (entries.length > 0) {
             const last = entries[entries.length - 1];
-            last.textContent = '[AI] ' + parsed.text;
+            last.textContent = parsed.text;
         } else if (parsed.text) {
             appendLog('AI', parsed.text);
         }
