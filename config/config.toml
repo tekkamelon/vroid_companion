@@ -14,7 +14,7 @@ args    = ["acp"]
 # goose の場合:
 # command = "goose"
 # args    = ["--acp"]  # 要確認
-cwd = "/home/yourname"  # エージェントのワーキングディレクトリ (絶対パス)
+cwd = "/home/tekkamelon"  # エージェントのワーキングディレクトリ (絶対パス)
 
 [model]
 # VRMファイルのパス (assets/models/からの相対パス)
@@ -30,5 +30,5 @@ provider = "openai"
 model = "tts-1"
 voice = "alloy"
 response_format = "mp3"
-# api_key は推奨: 環境変数 OPENAI_API_KEY
+# api_key は環境変数を推奨: 環境変数 OPENAI_API_KEY
 # api_key = "sk-..."
