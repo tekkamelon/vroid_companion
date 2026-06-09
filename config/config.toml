@@ -30,5 +30,7 @@ provider = "openai"
 model = "tts-1"
 voice = "alloy"
 response_format = "mp3"
+# base_url が未設定の場合は OpenAI 公式 API が使用される
+# base_url = "https://api.openai.com/v1"
 # api_key は環境変数を推奨: 環境変数 OPENAI_API_KEY
 # api_key = "sk-..."

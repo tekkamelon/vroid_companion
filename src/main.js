@@ -207,11 +207,12 @@ async function synthesizeSpeech(text, ttsConfig) {
     throw new Error('TTS api_key is missing (config.tts.api_key or OPENAI_API_KEY)');
   }
 
+  const baseUrl = ttsConfig?.base_url ?? 'https://api.openai.com/v1';
   const model = ttsConfig?.model ?? 'tts-1';
   const voice = ttsConfig?.voice ?? 'alloy';
   const responseFormat = ttsConfig?.response_format ?? 'mp3';
 
-  const response = await fetch('https://api.openai.com/v1/audio/speech', {
+  const response = await fetch(`${baseUrl}/audio/speech`, {
     method: 'POST',
     headers: {
       Authorization: 'Bearer ' + apiKey,
