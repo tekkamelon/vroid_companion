@@ -218,6 +218,7 @@ function animate() {
 
     if (currentVrm) {
         updateIdleMotion(currentVrm, delta);
+        updateLipSync(delta);
         updateExpressionFade(delta);
         currentVrm.update(delta);
     }
@@ -295,20 +296,146 @@ function updateExpressionFade(delta) {
     applyExpression(activeExpression.name, value);
 }
 
+const LIP_SYNC_FRAME_SIZE = 2048;
+const LIP_SYNC_NOISE_FLOOR = 0.015;
+const LIP_SYNC_FULL_SCALE = 0.14;
+const LIP_SYNC_ATTACK = 18;
+const LIP_SYNC_RELEASE = 10;
+
+let lipSyncState = {
+    audio: null,
+    rmsFrames: [],
+    frameSize: LIP_SYNC_FRAME_SIZE,
+    intensity: 0,
+};
+
+function clearLipSync(options = {}) {
+    const { immediate = true } = options;
+    lipSyncState.audio = null;
+    lipSyncState.rmsFrames = [];
+    if (immediate) {
+        lipSyncState.intensity = 0;
+    }
+    if (currentVrm?.expressionManager) {
+        currentVrm.expressionManager.setValue('aa', lipSyncState.intensity);
+    }
+}
+
+function base64ToBytes(base64) {
+    return Uint8Array.from(atob(base64), (char) => char.charCodeAt(0));
+}
+
+async function decodeAudioBuffer(bytes) {
+    const AudioContextCtor = window.AudioContext || window.webkitAudioContext;
+    if (!AudioContextCtor) {
+        throw new Error('Web Audio API is not available');
+    }
+
+    const audioContext = new AudioContextCtor();
+    try {
+        return await audioContext.decodeAudioData(bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength));
+    } finally {
+        if (typeof audioContext.close === 'function') {
+            audioContext.close().catch(() => {});
+        }
+    }
+}
+
+function buildRmsFrames(audioBuffer, frameSize = LIP_SYNC_FRAME_SIZE) {
+    const channelData = [];
+    for (let channel = 0; channel < audioBuffer.numberOfChannels; channel += 1) {
+        channelData.push(audioBuffer.getChannelData(channel));
+    }
+
+    const frameCount = Math.max(1, Math.ceil(audioBuffer.length / frameSize));
+    const frames = new Float32Array(frameCount);
+
+    for (let frame = 0; frame < frameCount; frame += 1) {
+        const start = frame * frameSize;
+        const end = Math.min(start + frameSize, audioBuffer.length);
+        let sumSquares = 0;
+        let sampleCount = 0;
+
+        for (let index = start; index < end; index += 1) {
+            let sample = 0;
+            for (let channel = 0; channel < channelData.length; channel += 1) {
+                sample += channelData[channel][index] ?? 0;
+            }
+            sample /= channelData.length || 1;
+            sumSquares += sample * sample;
+            sampleCount += 1;
+        }
+
+        frames[frame] = sampleCount > 0 ? Math.sqrt(sumSquares / sampleCount) : 0;
+    }
+
+    return frames;
+}
+
+function rmsToLipIntensity(rms) {
+    const normalized = THREE.MathUtils.clamp((rms - LIP_SYNC_NOISE_FLOOR) / (LIP_SYNC_FULL_SCALE - LIP_SYNC_NOISE_FLOOR), 0, 1);
+    return Math.sqrt(normalized);
+}
+
+function updateLipSync(delta) {
+    if (!currentVrm?.expressionManager) return;
+
+    const { audio, rmsFrames, frameSize } = lipSyncState;
+    if (!audio || !rmsFrames.length) {
+        if (lipSyncState.intensity !== 0) {
+            lipSyncState.intensity = Math.max(0, lipSyncState.intensity - delta * LIP_SYNC_RELEASE);
+            currentVrm.expressionManager.setValue('aa', lipSyncState.intensity);
+        }
+        return;
+    }
+
+    const sampleRate = audio._lipSyncSampleRate ?? 48000;
+    const frameIndex = Math.min(rmsFrames.length - 1, Math.max(0, Math.floor(audio.currentTime * sampleRate / frameSize)));
+    const targetIntensity = rmsToLipIntensity(rmsFrames[frameIndex] ?? 0);
+    const smoothing = targetIntensity > lipSyncState.intensity ? LIP_SYNC_ATTACK : LIP_SYNC_RELEASE;
+    lipSyncState.intensity += (targetIntensity - lipSyncState.intensity) * Math.min(1, delta * smoothing);
+    currentVrm.expressionManager.setValue('aa', THREE.MathUtils.clamp(lipSyncState.intensity, 0, 1));
+}
+
 async function playTts(text) {
     if (!text) return;
+    let objectUrl = null;
     try {
         const result = await window.companion.synthesizeSpeech(text);
         if (!result || result.disabled || !result.audioBase64) return;
 
-        const bytes = Uint8Array.from(atob(result.audioBase64), (c) => c.charCodeAt(0));
+        if (lipSyncState.audio && !lipSyncState.audio.ended) {
+            try {
+                lipSyncState.audio.pause();
+            } catch (_) {
+                // noop
+            }
+        }
+        clearLipSync();
+
+        const bytes = base64ToBytes(result.audioBase64);
+        const audioBuffer = await decodeAudioBuffer(bytes);
+        const rmsFrames = buildRmsFrames(audioBuffer);
         const blob = new Blob([bytes], { type: result.mimeType ?? 'audio/mpeg' });
-        const url = URL.createObjectURL(blob);
-        const audio = new Audio(url);
-        audio.addEventListener('ended', () => URL.revokeObjectURL(url), { once: true });
-        audio.addEventListener('error', () => URL.revokeObjectURL(url), { once: true });
+        objectUrl = URL.createObjectURL(blob);
+        const audio = new Audio(objectUrl);
+        audio._lipSyncSampleRate = audioBuffer.sampleRate;
+        lipSyncState.audio = audio;
+        lipSyncState.rmsFrames = rmsFrames;
+        lipSyncState.frameSize = LIP_SYNC_FRAME_SIZE;
+        lipSyncState.intensity = 0;
+        audio.addEventListener('ended', () => {
+            URL.revokeObjectURL(objectUrl);
+            clearLipSync({ immediate: false });
+        }, { once: true });
+        audio.addEventListener('error', () => {
+            URL.revokeObjectURL(objectUrl);
+            clearLipSync();
+        }, { once: true });
         await audio.play();
     } catch (err) {
+        if (objectUrl) URL.revokeObjectURL(objectUrl);
+        clearLipSync();
         console.warn('[TTS] playback skipped:', err?.message ?? err);
     }
 }
