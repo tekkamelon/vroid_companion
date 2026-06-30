@@ -14,6 +14,7 @@ const canvasArea = document.getElementById('canvas-area');
 const log    = document.getElementById('log');
 const input  = document.getElementById('msg-input');
 const btn    = document.getElementById('send-btn');
+const logToggleBtn = document.getElementById('log-toggle-btn');
 const bootNote = document.getElementById('boot-note');
 
 // ステータス表示用の要素を動的に作成して body に追加する
@@ -515,6 +516,14 @@ async function sendMessage() {
 }
 
 // 送信ボタンのクリックイベントを設定する
+// Toggle system/debug log visibility
+if (logToggleBtn && log) {
+    logToggleBtn.addEventListener('click', () => {
+        log.classList.toggle('show-logs');
+        logToggleBtn.classList.toggle('active');
+    });
+}
+
 btn.addEventListener('click', sendMessage);
 
 // Enter キーでメッセージを送信できるようにする

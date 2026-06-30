@@ -1,16 +1,12 @@
-/* すべての要素に border-box を適用してサイズ計算を統一する */
+/* border-box for all elements */
 * { box-sizing: border-box; margin: 0; padding: 0; }
-/* CSS カスタムプロパティ: チャットエリアの高さを定義する */
 :root { --chat-height: 240px; }
-/* ページ全体のサイズを画面いっぱいに設定する */
 html, body { width: 100%; height: 100%; overflow: hidden; }
-/* ページ全体の基本スタイルを設定する */
 body { background: #1a1a2e; color: #e0e0ff; font-family: sans-serif; height: 100%; display: flex; flex-direction: column; }
-/* 3Dキャンバス表示エリア: 残りのスペースをすべて占有する */
+
 #canvas-area { position: relative; width: 100%; flex: 1 1 auto; min-height: 0; overflow: hidden; }
-/* canvas 要素を親要素いっぱいに広げる */
 canvas { width: 100%; height: 100%; display: block; }
-/* 起動時の状態表示用ノート: 画面左上に表示される */
+
 #boot-note {
   position: absolute;
   inset: 16px auto auto 16px;
@@ -24,7 +20,7 @@ canvas { width: 100%; height: 100%; display: block; }
   letter-spacing: 0.02em;
   pointer-events: none;
 }
-/* ステータス表示: 画面上部に現在の状態を表示する */
+
 #status {
   position: fixed;
   top: 8px;
@@ -37,31 +33,110 @@ canvas { width: 100%; height: 100%; display: block; }
   font-size: 12px;
   pointer-events: none;
 }
-/* チャットエリア: 下部に固定された高さの領域 */
-#chat-area { width: 100%; flex: 0 0 var(--chat-height); min-height: var(--chat-height); max-height: var(--chat-height); overflow: hidden; background: #16213e; display: flex; flex-direction: column; padding: 8px; gap: 8px; }
-/* 会話ログ表示領域: スクロール可能なテキストエリア */
-#log { flex: 1 1 auto; min-height: 0; overflow-y: auto; overflow-x: hidden; font-size: 13px; line-height: 1.5; padding: 8px; display: flex; flex-direction: column; gap: 8px; }
 
-/* メッセージ行: ユーザーは右寄せ、AIは左寄せ、システムは中央 */
+#chat-area {
+  width: 100%;
+  flex: 0 0 var(--chat-height);
+  min-height: var(--chat-height);
+  max-height: var(--chat-height);
+  overflow: hidden;
+  background: #16213e;
+  display: flex;
+  flex-direction: column;
+  padding: 8px;
+  gap: 8px;
+}
+
+#log {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  overflow-x: hidden;
+  font-size: 13px;
+  line-height: 1.5;
+  padding: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+/* Default: hide system/debug logs */
+#log:not(.show-logs) .msg-row.system { display: none; }
+
 .msg-row { display: flex; width: 100%; }
 .msg-row.user   { justify-content: flex-end; }
 .msg-row.ai     { justify-content: flex-start; }
 .msg-row.system { justify-content: center; }
 
-/* メッセージバブル */
-.msg-bubble { max-width: 85%; padding: 8px 12px; border-radius: 12px; word-wrap: break-word; white-space: pre-wrap; overflow-wrap: anywhere; }
+.msg-bubble {
+  max-width: 85%;
+  padding: 8px 12px;
+  border-radius: 12px;
+  word-wrap: break-word;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
 
-/* ユーザーメッセージ: 右寄せバブル */
-.msg-row.user .msg-bubble { background: #0f3460; border: 1px solid #533483; color: #e0e0ff; border-bottom-right-radius: 4px; }
+.msg-row.user .msg-bubble {
+  background: #0f3460;
+  border: 1px solid #533483;
+  color: #e0e0ff;
+  border-bottom-right-radius: 4px;
+}
 
-/* AIメッセージ: 左寄せバブル */
-.msg-row.ai .msg-bubble { background: #1a1a3e; border: 1px solid #2e3658; color: #c0c8ff; border-bottom-left-radius: 4px; }
+.msg-row.ai .msg-bubble {
+  background: #1a1a3e;
+  border: 1px solid #2e3658;
+  color: #c0c8ff;
+  border-bottom-left-radius: 4px;
+}
 
-/* システム・デバッグメッセージ */
-.msg-row.system .msg-bubble { background: transparent; color: #8fe3ff; font-size: 11px; padding: 2px 6px; opacity: 0.7; }
-/* 入力欄とボタンの横並びレイアウト */
-#input-row { display: flex; gap: 8px; }
-/* テキスト入力欄のスタイル */
-#msg-input { flex: 1; background: #0f3460; border: 1px solid #533483; color: #e0e0ff; border-radius: 4px; padding: 6px 10px; font-size: 14px; }
-/* 送信ボタンのスタイル */
-#send-btn { background: #533483; color: #fff; border: none; border-radius: 4px; padding: 6px 16px; cursor: pointer; }
+.msg-row.system .msg-bubble {
+  background: rgba(15, 20, 44, 0.6);
+  color: #8fe3ff;
+  font-size: 11px;
+  padding: 4px 8px;
+  border-radius: 6px;
+  opacity: 0.8;
+}
+
+#input-row { display: flex; gap: 8px; align-items: center; }
+
+#msg-input {
+  flex: 1;
+  background: #0f3460;
+  border: 1px solid #533483;
+  color: #e0e0ff;
+  border-radius: 4px;
+  padding: 6px 10px;
+  font-size: 14px;
+}
+
+#send-btn {
+  background: #533483;
+  color: #fff;
+  border: none;
+  border-radius: 4px;
+  padding: 6px 16px;
+  cursor: pointer;
+}
+
+/* Log toggle button */
+#log-toggle-btn {
+  background: #1a1a3e;
+  border: 1px solid #2e3658;
+  border-radius: 4px;
+  padding: 6px 10px;
+  cursor: pointer;
+  font-size: 16px;
+  line-height: 1;
+  transition: background 0.2s, border-color 0.2s;
+}
+#log-toggle-btn:hover {
+  background: #252550;
+  border-color: #533483;
+}
+#log-toggle-btn.active {
+  background: #0f3460;
+  border-color: #8fe3ff;
+}

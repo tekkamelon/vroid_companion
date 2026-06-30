@@ -2,11 +2,11 @@
 <html lang="ja">
 <head>
   <meta charset="UTF-8">
-  <!-- Content Security Policy: 外部リソースの読み込みを制限する -->
+  <!-- Content Security Policy: limit external resources -->
   <meta http-equiv="Content-Security-Policy"
         content="default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' blob: data:; connect-src 'self' blob: data:; media-src 'self' blob: data:;">
   <title>VRoid Companion</title>
-  <!-- import map: three.js のパスを解決するためのマッピング -->
+  <!-- import map for three.js -->
   <script type="importmap">
     {
       "imports": {
@@ -17,24 +17,18 @@
   <link rel="stylesheet" href="./style.css">
 </head>
 <body>
-  <!-- 3Dモデル表示エリア -->
   <div id="canvas-area">
-    <!-- 起動時の読み込み状態を表示する要素 -->
     <div id="boot-note">VRoid Companion starting...</div>
-    <!-- Three.js で描画する canvas 要素 -->
     <canvas id="vrm-canvas"></canvas>
   </div>
-  <!-- チャットUIエリア -->
   <div id="chat-area">
-    <!-- 会話ログの表示領域 -->
     <div id="log"></div>
-    <!-- メッセージ入力欄と送信ボタン -->
     <div id="input-row">
-      <input id="msg-input" type="text" placeholder="メッセージを入力...">
-      <button id="send-btn">送信</button>
+      <input id="msg-input" type="text" placeholder="Type a message...">
+      <button id="send-btn">Send</button>
+      <button id="log-toggle-btn" title="Toggle system logs">📝</button>
     </div>
   </div>
-  <!-- メインのアプリケーションスクリプトをモジュールとして読み込む -->
   <script type="module" src="./app.js"></script>
 </body>
 </html>
