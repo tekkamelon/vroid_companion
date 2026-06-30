@@ -11,11 +11,24 @@ import { setupIdleMotion, updateIdleMotion } from './idle_motion.js';
 // DOM 要素への参照を取得する
 const canvas = document.getElementById('vrm-canvas');
 const canvasArea = document.getElementById('canvas-area');
+const chatArea = document.getElementById('chat-area');
 const log    = document.getElementById('log');
 const input  = document.getElementById('msg-input');
 const btn    = document.getElementById('send-btn');
 const logToggleBtn = document.getElementById('log-toggle-btn');
 const bootNote = document.getElementById('boot-note');
+
+function syncLogAreaVisibility() {
+    if (!log || !chatArea) return;
+
+    const showSystemLogs = log.classList.contains('show-logs');
+    const hasVisibleMessages = Boolean(
+        log.querySelector('.msg-row.user, .msg-row.ai') ||
+        (showSystemLogs && log.querySelector('.msg-row.system')),
+    );
+
+    chatArea.classList.toggle('is-collapsed', !hasVisibleMessages);
+}
 
 // ステータス表示用の要素を動的に作成して body に追加する
 const status = document.createElement('div');
@@ -467,6 +480,7 @@ function appendLog(who, text) {
     row.appendChild(bubble);
     log.appendChild(row);
     log.scrollTop = log.scrollHeight;
+    syncLogAreaVisibility();
     return bubble;
 }
 
@@ -480,6 +494,7 @@ function appendToLastMessage(text) {
     const last = entries[entries.length - 1];
     last.textContent += text;
     log.scrollTop = log.scrollHeight;
+    syncLogAreaVisibility();
 }
 
 // 入力されたメッセージを送信して AI 応答を待つ
@@ -521,8 +536,11 @@ if (logToggleBtn && log) {
     logToggleBtn.addEventListener('click', () => {
         log.classList.toggle('show-logs');
         logToggleBtn.classList.toggle('active');
+        syncLogAreaVisibility();
     });
 }
+
+syncLogAreaVisibility();
 
 btn.addEventListener('click', sendMessage);
 
