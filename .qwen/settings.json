@@ -1,0 +1,9 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(true)",
+      "Bash(git pull *)"
+    ]
+  },
+  "$version": 4
+}
