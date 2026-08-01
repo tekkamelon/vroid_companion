@@ -6,7 +6,7 @@
 # command = "zeroclaw"
 # args    = ["acp"]
 # kilocodeの場合:
-command = "kilocode"
+command = "opencode"
 args    = ["acp"]
 # opencode の場合:
 # command = "opencode"
