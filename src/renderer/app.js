@@ -502,6 +502,7 @@ async function sendMessage() {
     const text = input.value.trim();
     if (!text) return;
     input.value = '';
+    autosizeInput();
     appendLog('You', text);
 
     // ストリーミング表示用に空のAIメッセージを事前追加
@@ -544,8 +545,50 @@ syncLogAreaVisibility();
 
 btn.addEventListener('click', sendMessage);
 
-// Enter キーでメッセージを送信できるようにする
-input.addEventListener('keydown', (e) => { if (e.key === 'Enter') sendMessage(); });
+// 入力欄の高さの下限/上限 (style.css の min-height/max-height と一致させる)
+const INPUT_MIN_HEIGHT = 32;
+const INPUT_MAX_HEIGHT = 110;
+
+// 入力内容の行数 (改行数+1) に応じて入力欄の高さを自動調整する
+// 改行を1つ挿入するごとに1行分高さが広がる
+function autosizeInput() {
+    const lineCount = input.value.split('\n').length;
+    const styles = window.getComputedStyle(input);
+    const lineHeight = parseFloat(styles.lineHeight) || 20;
+    const padding = (parseFloat(styles.paddingTop) || 0) + (parseFloat(styles.paddingBottom) || 0);
+    const height = Math.min(lineCount * lineHeight + padding, INPUT_MAX_HEIGHT);
+    input.style.height = `${Math.max(height, INPUT_MIN_HEIGHT)}px`;
+}
+
+// カーソル位置に改行を挿入する (Ctrl+J 用)
+function insertNewline() {
+    const start = input.selectionStart ?? input.value.length;
+    const end = input.selectionEnd ?? start;
+    input.setRangeText('\n', start, end, 'end');
+    input.focus();
+    autosizeInput();
+}
+
+// Enter キーで送信、Ctrl+J で改行を挿入する
+// (IME変換中は Enter を送信と判定しない)
+input.addEventListener('keydown', (e) => {
+    const composing = e.isComposing || e.keyCode === 229;
+
+    if (e.key === 'j' && (e.ctrlKey || e.metaKey)) {
+        e.preventDefault();
+        insertNewline();
+        return;
+    }
+
+    if (e.key === 'Enter' && !composing && !e.shiftKey && !e.ctrlKey && !e.metaKey && !e.altKey) {
+        e.preventDefault();
+        sendMessage();
+    }
+});
+
+// 入力内容の変更 (ペースト・IME確定・削除など) に合わせて高さを調整する
+input.addEventListener('input', autosizeInput);
+autosizeInput(); // 初期表示の高さを1行分に揃える
 
 // Phase 4: ストリーミングチャンクを受信してリアルタイム表示
 window.companion.onChunk((text) => {
